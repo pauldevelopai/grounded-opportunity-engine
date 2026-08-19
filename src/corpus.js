@@ -2,10 +2,12 @@
 //
 // The GROUNDED vision: everything a node gathers accumulates in the corpora
 // (for opportunities, the "news & opportunities archive"), wearing the standard
-// record shape. The corpus API does not exist yet — this module is the CONTRACT
-// half built ahead of it: consumers project their entities through
-// toCorpusRecord() so that when the API lands, the write-back is a transport
-// change, not a data-model retrofit.
+// record shape. The corpus API EXISTS as of runtime v0.16.0: hosted/local Nodes
+// write through host.corpus (grounded-node-runtime/src/corpus.js — the
+// enforcement point, same rules as here), backed by grounded_corpus_records
+// (tracker migration 171) with an HTTP door at the tracker's /api/corpus.
+// Consumers project their entities through toCorpusRecord() and hand the
+// result to host.corpus.add() — collection 'news_opportunities'.
 //
 // Standard shape (vision, Aug 2026): source_url · date · jurisdiction ·
 // language · licence · verification_status (born 'ai_drafted', flipped to
