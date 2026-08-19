@@ -76,15 +76,29 @@ export function createPipeline(spec) {
   async function ingestItem({ newsroomId, sourceId, text, criteria, externalId, url = null, hints = null }) {
     const extId = externalId || sha(text).slice(0, 32);
 
-    // Raw item first (deduped per source). If it already exists, skip re-processing.
-    const { rows: [raw] } = await pool.query(
+    // Raw item first (deduped per source). If it already exists AND was fully
+    // processed, skip. If it exists but is still 'pending' with no entity — a
+    // previous attempt failed mid-extraction (API error, crash) — ADOPT it and
+    // process now: a failed item must be retryable, never poisoned by its own
+    // dedup row.
+    let { rows: [raw] } = await pool.query(
       `INSERT INTO ${schema}.raw_items (newsroom_id, source_id, external_id, url, content, status)
        VALUES ($1, $2, $3, $4, $5, 'pending')
        ON CONFLICT (source_id, external_id) DO NOTHING
        RETURNING id`,
       [newsroomId, sourceId, extId, url, text]
     );
-    if (!raw) return { duplicate: true, external_id: extId };
+    if (!raw) {
+      const { rows: [existing] } = await pool.query(
+        `SELECT id, status, ${spec.rawEntityFk} AS entity_ref FROM ${schema}.raw_items
+          WHERE source_id = $1 AND external_id = $2`,
+        [sourceId, extId]
+      );
+      if (!existing || existing.status !== 'pending' || existing.entity_ref) {
+        return { duplicate: true, external_id: extId };
+      }
+      raw = { id: existing.id };   // adopt the stranded attempt
+    }
 
     // Checkpoint 1 — fields, then backfill anything the source stated outright.
     const extracted = applyHints(await spec.extractFields(text), hints);
