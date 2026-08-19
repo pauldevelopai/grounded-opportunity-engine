@@ -106,6 +106,35 @@ null, { entity: 'company', starter: STARTER_COMPANY_CRITERIA, notes: … })` —
 the spread above preserves that override. Re-read the file at apply time in
 case the parallel build changed call shapes.
 
+## 4b. Peer-session deltas (confirmed 2026-08-19, from the session building plan v2)
+
+The node-leadfinder session confirmed these tree changes; the refit above
+already accounts for them, listed here so the applier re-checks at apply time:
+
+- **`lib/companies.js` (new)** calls `scoreTender()` with precomputed numeric
+  fields — served by the §2 re-export (`scoreEntity as scoreTender`), no
+  evaluator changes needed.
+- **`criteria_versions.entity`** ('tender'|'company', one active per
+  (tenant, entity), versions monotonic per tenant across entities) — exactly the
+  shape the engine's `criteria.js` implements; no adaptation needed.
+- **`getActiveCriteria`/`ensureStarterCriteria` take `entity` + injectable
+  `starter`** — preserved by the §4 wrappers (`...opts` spread last, so
+  companies.js's `{ entity: 'company', starter: STARTER_COMPANY_CRITERIA }`
+  override wins).
+- **`lib/routes.js` resolves tenancy in-Node** (JWT `newsroom_id`, else a
+  `team_members` lookup, fail closed) because runtime v0.14–v0.15 `tenantOf()`
+  pins hosted tenants to the JWT user id, which breaks any Node FK'd to
+  `public.newsrooms`. The engine is unaffected (it never resolves tenancy —
+  `newsroomId` is always a parameter) but do NOT "simplify" the Node's
+  resolution back onto the runtime until the runtime is fixed.
+- **`index.js` local entry** was fixed (createLiteHost `appSlug`; local
+  `createServer` has no `mountRoutes` — routes mount on the returned app).
+  Not touched by this refit; don't regress it.
+- **`lib/fetch.js` gained an `etenders_awards` adapter** — stays consumer code,
+  but its ingestion lesson is recorded engine-side (CLAUDE.md): awards appear on
+  releases MONTHS after the advertised window, so that walk uses an AGED window
+  (now−270d → now−60d) and skips individual 500 pages instead of aborting.
+
 ## 5. Verify (all against the LOCAL tracker DB, never the box first)
 
 1. `npm install` (after `rm -rf node_modules/@developai` if the pin changed).

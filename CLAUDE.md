@@ -44,6 +44,21 @@ See the JSDoc on `createPipeline` in `src/pipeline.js`. The live example is
 `leadfinder`, table `tenders`, first-class column map, LeadFinder's two
 extractors) and re-exports the configured pipeline under its legacy names.
 
+## Field lessons that bind consumers (paid for in production, 2026-08-19)
+- **Tenancy is the consumer's job, always.** The engine never resolves who the
+  tenant is — `newsroomId` is a parameter on every call. Do not wire tenancy to
+  the runtime's `tenantOf()`: in runtime v0.14–v0.15 it pins hosted tenants to
+  the JWT user id, which breaks any consumer whose tables FK
+  `public.newsrooms(id)` (LeadFinder resolves in-Node: JWT `newsroom_id`, else
+  `team_members` lookup, fail closed — copy that until the runtime is fixed).
+- **Some feeds mutate old records — the incremental-window rule inverts.**
+  OCDS eTenders awards appear on releases MONTHS after the advertised window
+  (measured: 244 recent releases → 0 awards; 9 aged Jan–Mar releases → 9
+  awards). An adapter for such a feed must walk an AGED window (e.g. now−270d →
+  now−60d) and skip individual failing pages rather than abort — a partial walk
+  is kept, not discarded. Dedup on (source, external_id) is what makes the
+  re-walk cheap and idempotent.
+
 ## What does NOT belong here
 Domain adapters, prompts, seed criteria, UI, schedulers, document intake — all
 consumer code. The tracker's `server/services/leadfinder/*` copies are STALE
