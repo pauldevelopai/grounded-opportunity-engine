@@ -8,7 +8,9 @@ inherits it. Consumers: **node-leadfinder** (L2B, entity `tender` + `company`)
 first; fundraising tenants (Positive Vibes — gated on concept-note approval)
 next; Develop AI as tenant zero.
 
-**Current tag: `v0.2.0`.** Consumed like the runtime:
+**Current tag: `v0.2.0`** — ⚠ committed and tagged LOCALLY, not yet pushed.
+`node-resources` already pins `#v0.2.0`, so `git push origin main --tags` here
+before anyone deploys it or runs a fresh `npm install` there. Consumed like the runtime:
 `github:pauldevelopai/grounded-opportunity-engine#vX.Y.Z` — bump version,
 commit, move the tag, then bump the pin in each consumer (npm caches github
 deps: `rm -rf node_modules/@developai && npm install` to force).
