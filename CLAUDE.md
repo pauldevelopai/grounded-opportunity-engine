@@ -8,7 +8,7 @@ inherits it. Consumers: **node-leadfinder** (L2B, entity `tender` + `company`)
 first; fundraising tenants (Positive Vibes — gated on concept-note approval)
 next; Develop AI as tenant zero.
 
-**Current tag: `v0.1.0`.** Consumed like the runtime:
+**Current tag: `v0.2.0`.** Consumed like the runtime:
 `github:pauldevelopai/grounded-opportunity-engine#vX.Y.Z` — bump version,
 commit, move the tag, then bump the pin in each consumer (npm caches github
 deps: `rm -rf node_modules/@developai && npm install` to force).
@@ -17,7 +17,7 @@ deps: `rm -rf node_modules/@developai && npm install` to force).
 
 | Engine (here) | Consumer (the Node) |
 |---|---|
-| Arithmetic scoring — generic rule evaluators (`range`, `grade_within`, `keyword_any`, `runway`, `completeness`), `registerEvaluator` for domain rules | Seed/starter criteria (business assumptions are tenant config) |
+| Arithmetic scoring — generic rule evaluators (`range`, `grade_within`, `keyword_any`, `keyword_none`, `runway`, `completeness`), `registerEvaluator` for domain rules | Seed/starter criteria (business assumptions are tenant config) |
 | Versioned per-entity criteria machinery (one active per tenant+entity, monotonic versions) | Its Postgres schema + `ensureSchema` (engine standard tables: `sources`, `criteria_versions`, `criteria_weights`, `raw_items`, the entity table, flags, `runs`) |
 | Pipeline: raw-item dedup → checkpoint 1 → score → checkpoint 2 → route → audit spine, honest per-source counts | Source adapters (OCDS, RSS, scrapers, uploads) — a source's shape is domain knowledge |
 | AI-checkpoint machinery (`makeFieldExtractor` / `makeEvidenceExtractor`), model call **dependency-injected** | The prompts, the field normalisation, and the model call itself (own key or `host.ai`) |
@@ -26,6 +26,14 @@ deps: `rm -rf node_modules/@developai && npm install` to force).
 ## Locked decisions (do not undo)
 - **Scoring is arithmetic, never model-decided.** The model extracts fields and
   quotes evidence at exactly two checkpoints; it never sets a band or score.
+- **Including and excluding match differently, on purpose** (v0.2.0).
+  `keyword_any` matches word-START ("road" hits roadworks) — over-matching is
+  cheap, the worst case is a candidate surfaced for review. `keyword_none`
+  matches WHOLE words, plural tolerated ("arms" must not bin the Armstrong
+  Foundation; "casino" still catches "casinos"). A missed exclusion is
+  recoverable because a person sees the item; a false exclusion is invisible —
+  a legitimate candidate routed red and never looked at. Do not "simplify"
+  these into one matcher.
 - **Zero npm dependencies.** The pg pool and the chat function are injected.
   Keep it that way — it's what lets one engine serve a standalone Node
   (own key, own pool) and a runtime-hosted Node (`host.ai`) identically.

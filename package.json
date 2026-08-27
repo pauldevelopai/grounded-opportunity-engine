@@ -1,6 +1,6 @@
 {
   "name": "@developai/grounded-opportunity-engine",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "The GROUNDED Opportunity Finder engine — search sources → find candidates → assess against an org profile → explain fit → human verifies. Shared capability consumed by Nodes (LeadFinder first); nodes are thin configurations of this engine.",
   "type": "module",

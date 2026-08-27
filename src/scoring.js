@@ -40,6 +40,39 @@ function toDate(v) {
 
 const clamp01 = (n) => Math.max(0, Math.min(1, n));
 
+// ── keyword matching, shared by keyword_any and keyword_none ────────────────
+// One implementation on purpose: "does this term appear" must mean exactly the
+// same thing whether a match is what the tenant wants or what they refuse.
+function haystack(rule, extracted) {
+  const fields = rule.fields || (rule.field ? [rule.field] : []);
+  // A field may hold an array (themes, geographies) — flatten rather than
+  // stringifying to "[object Object]".
+  const hay = fields
+    .map((f) => (Array.isArray(extracted[f]) ? extracted[f].join(' ') : String(extracted[f] || '')))
+    .join(' ').toLowerCase().trim();
+  return { hay, fields };
+}
+
+// Two deliberately different boundary rules, because the two directions have
+// opposite costs.
+//
+// INCLUDING (keyword_any) uses a word-START match: "road" hits road/roads/
+// roadworks but not "broadband". Over-matching a bit is what you want — the
+// worst case is a call surfaced for review.
+//
+// EXCLUDING (keyword_none) uses a WHOLE-word match (plural tolerated): "arms"
+// must not silently bin the Armstrong Foundation. A missed exclusion is
+// recoverable — a person sees the call and rejects it. A false exclusion is
+// invisible: a legitimate funder routed red and never looked at. So exclusion
+// is the conservative one.
+function firstKeywordHit(keywords, hay, { whole = false } = {}) {
+  return (keywords || []).find((k) => {
+    const kw = String(k).trim().toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (!kw) return false;
+    return new RegExp(whole ? `\\b${kw}(?:s|es)?\\b` : '\\b' + kw).test(hay);
+  });
+}
+
 // ── the rule evaluators — each returns { score: 0..1, note } ─────────────────
 // A rule's `field` names a key in the extracted object.
 export const EVALUATORS = {
@@ -70,18 +103,31 @@ export const EVALUATORS = {
   // (scan several) or a single `field`; matching across title+description matters
   // for feed sources whose title is a terse reference, not the subject.
   keyword_any(rule, extracted) {
-    const fields = rule.fields || (rule.field ? [rule.field] : []);
-    const hay = fields.map((f) => String(extracted[f] || '')).join(' ').toLowerCase().trim();
+    const { hay, fields } = haystack(rule, extracted);
     if (!hay) return { score: rule.missing_score ?? 0.3, note: `${fields.join('/') || 'field'} empty` };
-    // Word-START boundary match: "road" hits road/roads/roadworks but NOT "broadband";
-    // avoids the substring false positives plain includes() produced.
-    const hit = (rule.keywords || []).find((k) => {
-      const kw = String(k).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      return new RegExp('\\b' + kw).test(hay);
-    });
+    const hit = firstKeywordHit(rule.keywords, hay);
     return hit
       ? { score: 1, note: `matched "${hit}"` }
       : { score: rule.miss_score ?? 0.2, note: 'no keyword match' };
+  },
+
+  // The inverse: NONE of the keywords may appear. This is how a tenant's own
+  // "we will not touch this" list becomes arithmetic — the funders, sectors or
+  // conditions an org rules out, the clients a business won't bid for. A hit
+  // scores 0, so listing the component in thresholds.hard_rules routes it red
+  // outright whatever else it scores; `hard: true` on the rule does the same
+  // without the threshold entry.
+  //
+  // Safe when unconfigured, which matters because an empty exclusion list is
+  // the normal state: no keywords (or nothing to read) scores 1 and excludes
+  // nothing. It never invents a reason to reject.
+  keyword_none(rule, extracted) {
+    const { hay } = haystack(rule, extracted);
+    if (!hay) return { score: rule.missing_score ?? 1, note: 'nothing to check' };
+    const hit = firstKeywordHit(rule.keywords, hay, { whole: true });
+    return hit
+      ? { score: 0, note: `ruled out: matched "${hit}"`, hard: !!rule.hard }
+      : { score: 1, note: 'nothing ruled out' };
   },
 
   // enough runway before the closing date to prepare a competitive response.
