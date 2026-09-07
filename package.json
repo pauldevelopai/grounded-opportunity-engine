@@ -1,10 +1,14 @@
 {
   "name": "@developai/grounded-opportunity-engine",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "The GROUNDED Opportunity Finder engine — search sources → find candidates → assess against an org profile → explain fit → human verifies. Shared capability consumed by Nodes (LeadFinder first); nodes are thin configurations of this engine.",
   "type": "module",
   "main": "src/index.js",
+  "comment_tests": "node --test only — no framework, no devDependency. The zero-dependency rule is a locked decision (it is what lets one engine serve a standalone Node and a runtime-hosted Node identically), and it applies to the tests too.",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
   "exports": {
     ".": "./src/index.js"
   },

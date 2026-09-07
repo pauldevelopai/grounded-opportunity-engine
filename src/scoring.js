@@ -82,10 +82,20 @@ export const EVALUATORS = {
     if (val == null) return { score: rule.missing_score ?? 0.3, note: `${rule.field} not stated` };
     const { ideal_min = 0, ideal_max = Infinity, hard_min = 0, hard_max = Infinity } = rule;
     if (val >= ideal_min && val <= ideal_max) return { score: 1, note: `${rule.field} in ideal range` };
+    // Outside the ideal band, the score falls away LINEARLY towards the hard
+    // bound. With no hard bound on that side there is nothing to fall away
+    // towards: hard_max defaults to Infinity, and (Infinity - val) /
+    // (Infinity - ideal_max) is NaN, which then poisons the WHOLE item —
+    // `weighted += NaN` makes the total NaN, every band comparison is false,
+    // and the item silently lands in amber reading "score NaN". So an absent
+    // hard bound means "nothing out here is disqualifying", which scores full
+    // marks rather than nothing.
     if (val < ideal_min) {
+      if (!Number.isFinite(hard_min)) return { score: 1, note: `${rule.field} below ideal, no hard floor set` };
       const s = clamp01((val - hard_min) / Math.max(1, ideal_min - hard_min));
       return { score: s, note: `${rule.field} below ideal` };
     }
+    if (!Number.isFinite(hard_max)) return { score: 1, note: `${rule.field} above ideal, no hard ceiling set` };
     const s = clamp01((hard_max - val) / Math.max(1, hard_max - ideal_max));
     return { score: s, note: `${rule.field} above ideal` };
   },
