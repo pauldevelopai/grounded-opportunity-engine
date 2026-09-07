@@ -4,9 +4,17 @@ The shared **Opportunity Finder engine**: search sources → find candidates →
 assess against an org profile → explain fit → **human verifies**. Part of
 Grounded. Per the GROUNDED vision, nodes are THIN CONFIGURATIONS of this
 engine — when one tenant needs a feature it lands here and every tenant
-inherits it. Consumers: **node-leadfinder** (L2B, entity `tender` + `company`)
-first; fundraising tenants (Positive Vibes — gated on concept-note approval)
-next; Develop AI as tenant zero.
+inherits it.
+
+**Consumers, as configurations rather than clients** (2026-09-07): L2B has
+stopped using their app, so **node-leadfinder** is now the *tender-watching
+configuration* — kept and deployable for any business that sells to
+contractors, with no live tenant. **node-resources** is the *fundraising
+configuration* (first user Positive Vibes, gated on concept-note approval).
+Develop AI is tenant zero. The two are deliberately different, and
+[`docs/CONFIGURING_A_TENANT.md`](docs/CONFIGURING_A_TENANT.md) lays them side by
+side as the template for the next organisation — read that before configuring
+one, and before adding anything here.
 
 **Current tag: `v0.2.1`** — pushed (2026-09-07). v0.2.1 is the first version with
 tests, and fixes the NaN they found (see below). Consumed like the runtime:
