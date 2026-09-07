@@ -11,8 +11,19 @@ next; Develop AI as tenant zero.
 **Current tag: `v0.2.0`** — pushed (2026-09-07); `main` and the tag both sit on
 `4db9067`. Consumed like the runtime:
 `github:pauldevelopai/grounded-opportunity-engine#vX.Y.Z` — bump version,
-commit, move the tag, then bump the pin in each consumer (npm caches github
-deps: `rm -rf node_modules/@developai && npm install` to force).
+commit, move the tag, then bump the pin in each consumer.
+
+**Bumping a consumer's pin takes more than clearing the cache.** The usual
+remedy (`rm -rf node_modules/@developai && npm install`) is NOT enough on its
+own: the lockfile pins the old *commit SHA*, and npm honours that over an
+edited `package.json`, silently reinstalling the version you just bumped away
+from. Measured on LeadFinder's v0.1.0 → v0.2.0 bump. What re-resolves it:
+
+```bash
+npm install "github:pauldevelopai/grounded-opportunity-engine#vX.Y.Z"
+```
+
+Then check `package-lock.json` actually moved to the new SHA before committing.
 
 **Push the tag in the same breath as the commit.** A consumer's lockfile records
 the resolved *commit SHA*, not the tag, so an unpushed tag fails an off-laptop
