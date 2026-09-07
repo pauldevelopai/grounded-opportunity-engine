@@ -51,6 +51,48 @@ Two things worth reading off that table:
   first (3.0) — a funder whose priorities don't match yours will not fund you
   however well you write. Same arithmetic, different convictions.
 
+## The third example: scoring a SUBJECT, not a document
+
+Tender watching scores two entities, and the second is a different shape worth
+studying, because most new organisations eventually want it. A `tender` is a
+**document that arrives** — you read it once and judge it. A `company` is a
+**subject that accumulates** — nothing arrives, and the judgement is built from
+signals observed over time.
+
+`STARTER_COMPANY_CRITERIA` (`node-leadfinder/lib/companies.js`) answers "which
+buyer is worth calling", entirely with the `range` evaluator over derived
+numbers rather than extracted text:
+
+| Component | Weight | Reads | The question it asks |
+|---|---|---|---|
+| `sector_fit` | 3.5 | `sector_fit` 0..1 | Are they even in our sector? |
+| `activity_recent` | 2.5 | `signal_count_180d` | Are they actually doing things? |
+| `signal_recency` | 2.0 | `days_since_last_signal` | Recently, or historically? |
+| `award_value_fit` | 1.5 | `award_value_180d` | At a size that means budget? |
+| `cidb_known` | 1.0 | `has_cidb` 0/1 | Do we know enough to qualify them? |
+| `contactable` | 1.5 | `has_contact` 0/1 | Can we actually reach them? |
+
+Three transferable lessons in that table:
+
+- **No new evaluators were needed.** Booleans are `range` with `ideal_min: 1,
+  ideal_max: 1`; "more is better" is `range` with an effectively unbounded
+  ceiling; recency is `range` over an age in days. Before asking for an
+  evaluator, check whether the question is a number in disguise.
+- **Sector fit is weighted highest and the reason is written down.** An early
+  version put big public-contract winners at the top of the call list, because
+  winning scored well and nothing asked what the company *does* — so a
+  contractor-services business was handed leads it could not sell to. The fix
+  was a weight, not code.
+- **"Can we reach them" is a scoring component.** An unactionable lead is not a
+  lead. Whatever the domain, ask what makes a candidate *actionable* and score
+  that too, rather than discovering it at the point of use.
+
+There is also a `keyword_none` shaped hole here: a former client's own book of
+existing customers is suppression data (`cms_accounts` in that schema), so
+"already a customer" is a filter rather than a score. A new organisation almost
+always has an equivalent list, and asking for it early is worth more than most
+scoring tuning.
+
 ## What NEVER changes
 
 These are engine, and a new org gets them for free:
