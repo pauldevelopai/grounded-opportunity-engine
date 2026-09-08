@@ -9,5 +9,5 @@ export { EVALUATORS, registerEvaluator, scoreEntity } from './scoring.js';
 export { getActiveCriteria, ensureStarterCriteria } from './criteria.js';
 export { ensureSource, markSourceFetch } from './sources.js';
 export { parseJson, makeFieldExtractor, makeEvidenceExtractor } from './ai.js';
-export { createPipeline, bandToStatus, applyHints } from './pipeline.js';
+export { createPipeline, bandToStatus, applyHints, applyBandFloor } from './pipeline.js';
 export { toCorpusRecord } from './corpus.js';

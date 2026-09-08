@@ -16,8 +16,9 @@ Develop AI is tenant zero. The two are deliberately different, and
 side as the template for the next organisation — read that before configuring
 one, and before adding anything here.
 
-**Current tag: `v0.2.1`** — pushed (2026-09-07). v0.2.1 is the first version with
-tests, and fixes the NaN they found (see below). Consumed like the runtime:
+**Current tag: `v0.3.0`** — pushed (2026-09-08). v0.3.0 adds the `adjustBand`
+band floor (below); v0.2.1 added the first tests and fixed the NaN they found.
+Consumed like the runtime:
 `github:pauldevelopai/grounded-opportunity-engine#vX.Y.Z` — bump version,
 commit, move the tag, then bump the pin in each consumer.
 
@@ -87,6 +88,37 @@ unchanged. It was latent rather than live: LeadFinder's `sector_fit`,
 the first is documented 0..1 and the others are strict 0/1, so nothing exceeded
 the ideal in practice. A model returning `sector_fit: 1.2` would have triggered
 it.
+
+## The band floor (`adjustBand`, v0.3.0)
+
+`thresholds.hard_rules` only fires on an exact component score of **0**, so a
+component that merely scores BADLY cannot reject an item — and a strong total
+then carries a candidate that fails the one thing that matters into the top
+band. Both consumers hit this independently:
+
+- LeadFinder was putting a training company (`sector_fit` 0.05) in "call first"
+  because a big contract value out-voted the sector, and worked around it
+  *outside* the pipeline (`scoreCompany` in `node-leadfinder/lib/companies.js`).
+- The tracker's newsroom Opportunity Finder routed an **off-theme construction
+  tender green to a health newsroom** — measured at 65.5 against a green line of
+  65, because everything except the theme was perfect.
+
+Two consumers, one workaround, so it belongs here. Optional spec hook:
+
+```js
+adjustBand: (scoreResult, extracted) => ({ band: 'amber', reason: '…' }) | null
+```
+
+**DEMOTE ONLY, and that is the load-bearing part.** A consumer may hold a
+candidate back and must say why; it may never promote one. Promotion would let
+config launder a weak candidate into green and quietly undo "scoring is
+arithmetic" — a band would stop being explainable from the numbers. An attempted
+promotion is ignored rather than thrown, because a scan of 40 items must not die
+on one bad hook return, and a hook that throws keeps the arithmetic band.
+
+The arithmetic is never touched: `total` and `component_scores` stay exactly as
+scored, so a demotion shows up as a band that disagrees with the total, with
+`routing_reason` saying why. Absent hook = unchanged behaviour.
 
 ## Locked decisions (do not undo)
 - **Scoring is arithmetic, never model-decided.** The model extracts fields and

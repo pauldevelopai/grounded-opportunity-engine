@@ -39,6 +39,59 @@ export function applyHints(extracted, hints) {
 }
 
 /**
+ * Apply a consumer's optional band floor, AFTER the arithmetic and before
+ * anything is persisted.
+ *
+ * WHY THIS EXISTS. `thresholds.hard_rules` only fires on an exact component
+ * score of 0, so a component that merely scores BADLY cannot reject an item —
+ * and a strong total can carry a candidate that fails the one thing that
+ * actually matters into the top band. Both consumers hit this: LeadFinder was
+ * putting a training company (sector_fit 0.05) in "call first" because a big
+ * contract value out-voted the sector, and had to work around it outside the
+ * pipeline; the newsroom Opportunity Finder was routing an off-theme
+ * construction tender green because everything except the theme was perfect.
+ * Two consumers, one workaround — so it belongs here.
+ *
+ * spec.adjustBand: (scoreResult, extracted) => { band, reason } | null
+ *
+ * DEMOTE ONLY, on purpose. A consumer may hold a candidate back and must say
+ * why; it may never promote one. Promotion would let a config launder a weak
+ * candidate into the top band and quietly undo "scoring is arithmetic" — the
+ * whole point being that a band can always be explained from the numbers. An
+ * attempted promotion is ignored rather than throwing, because a scan of 40
+ * items should not die on one bad hook return, and the reason is recorded on
+ * the item either way.
+ *
+ * The arithmetic itself is never touched: total and component_scores stay
+ * exactly as scored, so the demotion is visible as a band that disagrees with
+ * the total, with routing_reason saying why.
+ */
+const BAND_RANK = { green: 0, amber: 1, red: 2 };
+
+export function applyBandFloor(spec, scoreResult, extracted) {
+  if (typeof spec.adjustBand !== 'function') return scoreResult;
+  let out;
+  try {
+    out = spec.adjustBand(scoreResult, extracted);
+  } catch (err) {
+    console.error('[engine] adjustBand threw, keeping the arithmetic band:', err.message);
+    return scoreResult;
+  }
+  if (!out || !out.band || out.band === scoreResult.band) return scoreResult;
+  if (!(out.band in BAND_RANK)) return scoreResult;
+  // Demote only.
+  if (BAND_RANK[out.band] <= BAND_RANK[scoreResult.band]) return scoreResult;
+  const reason = String(out.reason || '').trim();
+  return {
+    ...scoreResult,
+    band: out.band,
+    routing_reason: reason
+      ? `${scoreResult.routing_reason} — held back: ${reason}`
+      : `${scoreResult.routing_reason} — held back by the tenant's band floor`,
+  };
+}
+
+/**
  * Build a configured pipeline from an entity spec:
  * {
  *   pool,                      // pg pool (consumer-owned)
@@ -55,6 +108,7 @@ export function applyHints(extracted, hints) {
  *   extractFields,             // checkpoint 1: async (text) => extracted
  *   extractEvidence,           // checkpoint 2: async (text, extracted, score) => {flags, qualification_note}
  *   presentResult,             // optional: (extracted) => fields merged into each result (for digests/UI)
+ *   adjustBand,                // optional: (score, extracted) => {band, reason} — DEMOTE only, see applyBandFloor
  * }
  */
 export function createPipeline(spec) {
@@ -103,7 +157,7 @@ export function createPipeline(spec) {
     // Checkpoint 1 — fields, then backfill anything the source stated outright.
     const extracted = applyHints(await spec.extractFields(text), hints);
     // Deterministic scoring against the tenant's criteria.
-    const scoreResult = scoreEntity(extracted, criteria);
+    const scoreResult = applyBandFloor(spec, scoreEntity(extracted, criteria), extracted);
     // Checkpoint 2 — evidence + qualification (never re-scores).
     const evidence = await spec.extractEvidence(text, extracted, scoreResult);
 
